@@ -1,6 +1,6 @@
 # downgrid
 
-downgrid is an osu!direct alternative to download beatmaps on multiplayer lobbies. 
+an osu!direct like beatmap downloader for you to use in multiplayer lobbies or downloading beatmaps with a single click in game
 
 downgrid basically masks itself as a web browser and whenever you click to a link, it detects if the url is a beatmap url. If it is, then downgrid download the associated beatmap from chimu.moe. 
 
