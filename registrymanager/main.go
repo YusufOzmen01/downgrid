@@ -15,13 +15,23 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+func checkForAdmin() bool {
+	_, err := os.Open("\\\\.\\PHYSICALDRIVE0")
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func GetBrowserPath() string {
-	log.Println("User requested browserpath")
 	k, _, _ := registry.CreateKey(registry.CURRENT_USER, "Software\\downgrid", registry.QUERY_VALUE|registry.SET_VALUE)
 
 	val, _, err := k.GetStringValue("browserpath")
 	if err == windows.ERROR_FILE_NOT_FOUND || len(os.Args) == 1 {
-		log.Println("Prompting user to choose a web browser")
+		if checkForAdmin() == false {
+			MessageBoxPlain("Error", "You need to run the app as administrator to update the browser path.")
+			os.Exit(1)
+		}
 		result, err := cfdutil.ShowOpenFileDialog(cfd.DialogConfig{
 			Title: "Choose your web browser",
 			Role:  "ChooseWebBrowser",
@@ -32,9 +42,7 @@ func GetBrowserPath() string {
 				},
 			},
 		})
-		if err == cfd.ErrorCancelled {
-			log.Fatal("Dialog was cancelled by the user.")
-		} else if err != nil {
+		if err != nil {
 			log.Fatal(err)
 		}
 		err = k.SetStringValue("browserpath", result)
@@ -43,12 +51,10 @@ func GetBrowserPath() string {
 		}
 		return result
 	}
-	log.Println("Browser path is " + val)
 	return val
 }
 
 func Register() {
-	log.Println("Checking if downgrid is registered as a web browser")
 	p, _ := os.Executable()
 
 	_, existing, _ := registry.CreateKey(registry.LOCAL_MACHINE, "SOFTWARE\\Classes\\downgridURL\\shell\\open\\command", registry.QUERY_VALUE)
@@ -57,7 +63,6 @@ func Register() {
 	if existing {
 		r, _, _ := k.GetStringValue("Path")
 		if r == p {
-			log.Println("Downgrid is registered at " + r)
 			return
 		}
 	}
@@ -96,8 +101,6 @@ func Register() {
 		log.Fatal(err)
 	}
 
-	log.Println("Registry file created")
-
 	datawriter := bufio.NewWriter(file)
 	for _, data := range r {
 		_, _ = datawriter.WriteString(data)
@@ -111,13 +114,12 @@ func Register() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Registry file written")
 
 	cmd := exec.Command("regedit", "/s", "register.reg")
 	err = cmd.Start()
 	if err != nil {
 		MessageBoxPlain("Error", "Looks like downgrid is not configured yet. Run this app as administrator for the initial setup.")
-		log.Fatal("Requires administrative privileges")
+		os.Exit(1)
 	}
 
 	err = cmd.Wait()
@@ -125,19 +127,15 @@ func Register() {
 		return
 	}
 
-	log.Println("Registration succeeded")
-
 	err = os.Remove("register.reg")
 	if err != nil {
 		return
 	}
-	log.Println("Registry file deleted")
 
 	err = k.SetStringValue("Path", p)
 	if err != nil {
 		return
 	}
-	log.Println("Downgrid is registered at " + p)
 }
 
 func MessageBox(hwnd uintptr, caption, title string, flags uint) int {
@@ -151,7 +149,6 @@ func MessageBox(hwnd uintptr, caption, title string, flags uint) int {
 }
 
 func MessageBoxPlain(title, caption string) int {
-	log.Println("Displaying a message box")
 	const (
 		NULL = 0
 		MbOk = 0

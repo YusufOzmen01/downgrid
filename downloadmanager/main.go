@@ -2,12 +2,10 @@ package downloadmanager
 
 import (
 	"io"
-	"log"
 	"mime"
 	"net/http"
 	"os"
-
-	"github.com/schollz/progressbar/v3"
+	"regexp"
 )
 
 type WriteCounter struct {
@@ -27,10 +25,10 @@ func (wc *WriteCounter) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-func DownloadFile(url string, path string, fn *WriteCounter, text string) {
-	log.Println("File download requested with url " + url + " and path " + path)
+func DownloadFile(setid string, fn *WriteCounter) {
 	cli := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", "https://chimu.moe/d/"+setid, nil)
+	d, _ := os.UserHomeDir()
 
 	if err != nil {
 		fn.Error = err
@@ -58,21 +56,21 @@ func DownloadFile(url string, path string, fn *WriteCounter, text string) {
 
 	fn.Total = uint64(resp.ContentLength)
 
-	log.Println("File created")
-	file, err := os.Create(path + filename)
+	r := regexp.MustCompile("[^a-zA-Z0-9\\.\\-]")
+
+	file, err := os.Create(d + "\\" + r.ReplaceAllString(filename, "$1"))
+	if err != nil {
+		fn.Error = err
+		return
+	}
+
+	_, err = io.Copy(file, io.TeeReader(resp.Body, fn))
 	if err != nil {
 		fn.Error = err
 	}
-
-	_, err = io.Copy(io.MultiWriter(progressbar.DefaultBytes(resp.ContentLength, text), file), io.TeeReader(resp.Body, fn))
-	if err != nil {
-		fn.Error = err
-	}
-
-	log.Println("File downloaded successfully")
 
 	defer resp.Body.Close()
+	fn.FilePath = d + "\\" + r.ReplaceAllString(filename, "$1")
 	fn.Done = true
-	fn.FilePath = path + filename
 	fn.Response = resp
 }
